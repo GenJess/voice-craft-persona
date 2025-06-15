@@ -32,7 +32,8 @@ serve(async (req) => {
     const agentName = `${first_name} ${last_name}'s Persona`;
     const agentPrompt = `You are a professional AI persona for ${first_name} ${last_name}. Your background, skills, and experience are based on the following resume:\n\n${resumeText}\n\nYou must answer questions as if you are ${first_name}, drawing upon the information provided in the resume. Be professional, engaging, and embody the persona of the individual from the resume.`;
     
-    const createAgentResponse = await fetch("https://api.elevenlabs.io/v1/agents", {
+    // FIX: Changed the URL to the correct endpoint for conversational agents
+    const createAgentResponse = await fetch("https://api.elevenlabs.io/v1/convai/agents", {
         method: "POST",
         headers: { "Content-Type": "application/json", "xi-api-key": elevenlabs_api_key },
         body: JSON.stringify({

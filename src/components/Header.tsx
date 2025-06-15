@@ -1,18 +1,31 @@
 
-import { Link, useLocation } from 'react-router-dom';
-import { BotMessageSquare, User } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { BotMessageSquare, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthProvider';
+import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/components/ui/use-toast';
 
 const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { session } = useAuth();
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/personas', label: 'Personas' },
   ];
 
-  // TODO: Replace with actual auth state
-  const isSignedIn = false; // This will be replaced with actual auth logic
+  const handleSignOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({ title: "Error signing out", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Signed out" });
+      navigate('/');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
@@ -35,8 +48,8 @@ const Header = () => {
             </Link>
           ))}
         </nav>
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          {isSignedIn ? (
+        <div className="flex flex-1 items-center justify-end space-x-2">
+          {session ? (
             <>
               <Button variant="ghost" asChild>
                 <Link to="/create-persona">Create Persona</Link>
@@ -45,6 +58,9 @@ const Header = () => {
                 <Link to="/account">
                   <User className="h-4 w-4" />
                 </Link>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sign Out">
+                <LogOut className="h-4 w-4" />
               </Button>
             </>
           ) : (

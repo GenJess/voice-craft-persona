@@ -28,11 +28,10 @@ serve(async (req) => {
 
     const resumeText = resume_text;
 
-    // 3. Create ElevenLabs agent
+    // Create ElevenLabs agent
     const agentName = `${first_name} ${last_name}'s Persona`;
     const agentPrompt = `You are a professional AI persona for ${first_name} ${last_name}. Your background, skills, and experience are based on the following resume:\n\n${resumeText}\n\nYou must answer questions as if you are ${first_name}, drawing upon the information provided in the resume. Be professional, engaging, and embody the persona of the individual from the resume.`;
     
-    // FIX: Changed the URL to the correct endpoint for creating conversational agents, based on user feedback.
     const createAgentResponse = await fetch("https://api.elevenlabs.io/v1/convai/agents/create", {
         method: "POST",
         headers: { "Content-Type": "application/json", "xi-api-key": elevenlabs_api_key },
@@ -42,6 +41,14 @@ serve(async (req) => {
             prompt: agentPrompt,
             initial_message: `Hello, this is the AI persona for ${first_name} ${last_name}. How can I assist you today?`,
             voice_id: "pFZP5JQG7iQjIQuC4Bku", // Using "Lily" as a default voice
+            conversation_config: {
+                turn_detection: {
+                    type: "server_vad",
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 200
+                }
+            }
         }),
     });
 
@@ -54,7 +61,7 @@ serve(async (req) => {
     const agentData = await createAgentResponse.json();
     const agent_id = agentData.agent_id;
 
-    // 4. Get the conversation signed URL
+    // Get the conversation signed URL
     const getSignedUrlResponse = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get_signed_url?agent_id=${agent_id}`, {
         headers: { "xi-api-key": elevenlabs_api_key },
     });

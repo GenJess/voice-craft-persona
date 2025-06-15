@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import { processDocument } from '@/services/documentService';
 
 const CreatePersona = () => {
   const { session, user } = useAuth();
@@ -18,10 +20,12 @@ const CreatePersona = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeText, setResumeText] = useState('');
   const [fileName, setFileName] = useState('');
   const [isPublic, setIsPublic] = useState('private');
   const [personaOutput, setPersonaOutput] = useState<{status: 'idle' | 'success' | 'error', message: string}>({status: 'idle', message: ''});
-
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -29,21 +33,68 @@ const CreatePersona = () => {
     }
   }, [session, navigate]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setResumeFile(file);
       setFileName(file.name);
+      setIsProcessingFile(true);
+
+      try {
+        const result = await processDocument(file);
+        if (result.success) {
+          setResumeText(result.text);
+          toast({
+            title: 'Document processed successfully',
+            description: 'Your resume text has been extracted and is ready to use.',
+          });
+        } else {
+          toast({
+            title: 'Document processing failed',
+            description: result.error || 'Could not extract text from the document.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: 'Error processing document',
+          description: 'An unexpected error occurred while processing your document.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsProcessingFile(false);
+      }
     } else {
       setResumeFile(null);
       setFileName('');
+      setResumeText('');
     }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!resumeFile || !user) {
-      toast({ title: 'Error', description: 'Please upload a resume file.', variant: 'destructive'});
+    if (!resumeText.trim()) {
+      toast({ 
+        title: 'Resume Required', 
+        description: 'Please upload a resume file or paste resume text.', 
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!elevenLabsApiKey.trim()) {
+      toast({ 
+        title: 'API Key Required', 
+        description: 'Please provide your ElevenLabs API key.', 
+        variant: 'destructive'
+      });
+      return;
+    }
+    if (!user) {
+      toast({ 
+        title: 'Authentication Error', 
+        description: 'Please sign in to create a persona.', 
+        variant: 'destructive'
+      });
       return;
     }
     
@@ -51,36 +102,62 @@ const CreatePersona = () => {
     setPersonaOutput({ status: 'idle', message: '' });
 
     try {
-      const filePath = `${user.id}/${Date.now()}_${resumeFile.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('resumes')
-        .upload(filePath, resumeFile);
+      // Get user profile for first/last name
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
 
-      if (uploadError) {
-        throw uploadError;
+      if (!profile?.first_name || !profile?.last_name) {
+        throw new Error('User profile incomplete. Please ensure your first and last name are set.');
       }
+
+      // Create ElevenLabs agent
+      const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
+        body: {
+          resume_text: resumeText,
+          first_name: profile.first_name,
+          last_name: profile.last_name,
+          elevenlabs_api_key: elevenLabsApiKey,
+        },
+      });
+
+      if (agentError) throw agentError;
       
+      // Store persona in database
       const { error: insertError } = await supabase
         .from('personas')
         .insert({
           user_id: user.id,
-          resume_path: filePath,
           is_public: isPublic === 'public',
+          elevenlabs_api_key: elevenLabsApiKey,
+          agent_id: agentData.agent_id,
+          conversation_link: agentData.conversation_link,
         });
       
       if (insertError) {
-        await supabase.storage.from('resumes').remove([filePath]);
         throw insertError;
       }
 
-      setPersonaOutput({ status: 'success', message: 'Your persona has been created successfully! You can now view it in your account page.' });
+      setPersonaOutput({ 
+        status: 'success', 
+        message: 'Your persona has been created successfully! You can now view it in your account page.' 
+      });
       toast({ title: 'Success!', description: 'Persona created successfully.' });
       setTimeout(() => navigate('/account'), 3000);
 
     } catch (error: any) {
       console.error("Error creating persona:", error);
-      setPersonaOutput({ status: 'error', message: `An error occurred: ${error.message}` });
-      toast({ title: 'Error Creating Persona', description: error.message, variant: 'destructive' });
+      setPersonaOutput({ 
+        status: 'error', 
+        message: `An error occurred: ${error.message}` 
+      });
+      toast({ 
+        title: 'Error Creating Persona', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
     } finally {
       setIsLoading(false);
     }
@@ -95,14 +172,56 @@ const CreatePersona = () => {
       <Card className="w-full max-w-2xl bg-card/50">
         <CardHeader>
           <CardTitle className="font-display text-2xl">Create Your Persona</CardTitle>
-          <CardDescription>Fill out the form below to generate your interactive professional persona.</CardDescription>
+          <CardDescription>Upload your resume or paste the text to generate your interactive professional persona.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
-              <Input id="resume" type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold cursor-pointer" accept=".pdf,.docx,.txt" required />
-              {fileName && <p className="text-sm text-muted-foreground mt-1">File: {fileName}</p>}
+              <Input 
+                id="resume" 
+                type="file" 
+                onChange={handleFileChange} 
+                className="file:text-primary file:font-semibold cursor-pointer" 
+                accept=".pdf,.docx,.txt,.doc" 
+                disabled={isProcessingFile}
+              />
+              {isProcessingFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Processing document...</span>
+                </div>
+              )}
+              {fileName && !isProcessingFile && (
+                <p className="text-sm text-muted-foreground mt-1">File: {fileName}</p>
+              )}
+            </div>
+
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="resume-text">Resume Text (Auto-filled from upload or paste manually)</Label>
+              <Textarea
+                id="resume-text"
+                placeholder="Paste your resume text here or upload a file above..."
+                className="min-h-[200px]"
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="elevenlabs-api-key">ElevenLabs API Key</Label>
+              <Input 
+                id="elevenlabs-api-key" 
+                type="password" 
+                placeholder="Your ElevenLabs API Key" 
+                required 
+                value={elevenLabsApiKey} 
+                onChange={(e) => setElevenLabsApiKey(e.target.value)} 
+              />
+              <p className="text-xs text-muted-foreground">
+                Needed to create your AI voice agent. Find it <a href="https://elevenlabs.io/subscription" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">here</a>.
+              </p>
             </div>
 
             <div className="grid w-full items-center gap-1.5">
@@ -118,17 +237,10 @@ const CreatePersona = () => {
                 </Label>
               </RadioGroup>
             </div>
-            
-            <div className="p-4 border-l-4 border-primary bg-primary/10 text-primary-foreground/80 rounded-r-md">
-                <p className="text-sm font-semibold text-primary">Note on API Keys</p>
-                <p className="text-xs text-primary/80">
-                    For now, creating a persona only requires a resume. API key integration for AI generation is coming soon.
-                </p>
-            </div>
 
           </CardContent>
           <CardFooter className="flex flex-col items-stretch">
-            <Button type="submit" disabled={isLoading} size="lg" className="font-semibold">
+            <Button type="submit" disabled={isLoading || isProcessingFile} size="lg" className="font-semibold">
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

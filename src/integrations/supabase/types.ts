@@ -15,6 +15,8 @@ export type Database = {
           avatar_url: string | null
           conversation_link: string | null
           created_at: string
+          elevenlabs_agent_id: string | null
+          elevenlabs_agent_link: string | null
           elevenlabs_api_key: string | null
           id: string
           is_public: boolean | null
@@ -27,6 +29,8 @@ export type Database = {
           avatar_url?: string | null
           conversation_link?: string | null
           created_at?: string
+          elevenlabs_agent_id?: string | null
+          elevenlabs_agent_link?: string | null
           elevenlabs_api_key?: string | null
           id?: string
           is_public?: boolean | null
@@ -39,6 +43,8 @@ export type Database = {
           avatar_url?: string | null
           conversation_link?: string | null
           created_at?: string
+          elevenlabs_agent_id?: string | null
+          elevenlabs_agent_link?: string | null
           elevenlabs_api_key?: string | null
           id?: string
           is_public?: boolean | null
@@ -50,16 +56,22 @@ export type Database = {
       }
       profiles: {
         Row: {
+          elevenlabs_agent_id: string | null
+          elevenlabs_agent_link: string | null
           first_name: string | null
           id: string
           last_name: string | null
         }
         Insert: {
+          elevenlabs_agent_id?: string | null
+          elevenlabs_agent_link?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
         }
         Update: {
+          elevenlabs_agent_id?: string | null
+          elevenlabs_agent_link?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { processDocument } from '@/services/documentService';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SignUp = () => {
@@ -19,17 +19,52 @@ const SignUp = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [resumeText, setResumeText] = useState('');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isPublic, setIsPublic] = useState('private');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setResumeFile(file);
+    setIsProcessingFile(true);
+
+    try {
+      const result = await processDocument(file);
+      if (result.success) {
+        setResumeText(result.text);
+        toast({
+          title: 'Document processed successfully',
+          description: 'Your resume text has been extracted and is ready to use.',
+        });
+      } else {
+        toast({
+          title: 'Document processing failed',
+          description: result.error || 'Could not extract text from the document.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error processing document',
+        description: 'An unexpected error occurred while processing your document.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!resumeText.trim()) {
       toast({
         title: 'Resume Required',
-        description: 'Please paste your resume to create a persona.',
+        description: 'Please paste your resume or upload a document to create a persona.',
         variant: 'destructive',
       });
       return;
@@ -44,7 +79,7 @@ const SignUp = () => {
     }
     setIsLoading(true);
 
-    // 1. Sign up the user. The profile will be created automatically via a trigger.
+    // 1. Sign up the user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -67,8 +102,6 @@ const SignUp = () => {
       return;
     }
     
-    // After sign-up, the user object might be null until email confirmation.
-    // However, the session might contain the user temporarily. We rely on authData.user
     const user = authData.user;
     if (!user) {
         setIsLoading(false);
@@ -80,7 +113,7 @@ const SignUp = () => {
         return;
     }
     
-    // 2. Create ElevenLabs agent via Edge Function (no file upload)
+    // 2. Create ElevenLabs agent via Edge Function
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
         body: {
@@ -149,31 +182,38 @@ const SignUp = () => {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Create a password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-             <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="resume-text">Paste Your Resume</Label>
+            
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
+              <Input 
+                id="resume" 
+                type="file" 
+                onChange={handleFileChange} 
+                className="file:text-primary file:font-semibold cursor-pointer" 
+                accept=".pdf,.docx,.txt,.doc"
+                disabled={isProcessingFile}
+              />
+              {isProcessingFile && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Processing document...</span>
+                </div>
+              )}
+              {resumeFile && !isProcessingFile && (
+                <p className="text-sm text-muted-foreground">File: {resumeFile.name}</p>
+              )}
+            </div>
+
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="resume-text">Resume Text (Auto-filled from upload or paste manually)</Label>
                <Textarea
                 id="resume-text"
-                placeholder="Paste your resume text here..."
+                placeholder="Paste your resume text here or upload a file above..."
                 className="min-h-[150px]"
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
                 required
               />
-            </div>
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="w-full">
-                      <Input id="resume" type="file" className="file:text-primary file:font-semibold cursor-not-allowed" disabled />
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Due to traffic/load issues, fixing soon</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="elevenlabs-api-key">ElevenLabs API Key</Label>
@@ -195,7 +235,7 @@ const SignUp = () => {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" disabled={isLoading} className="w-full font-semibold">
+            <Button type="submit" disabled={isLoading || isProcessingFile} className="w-full font-semibold">
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

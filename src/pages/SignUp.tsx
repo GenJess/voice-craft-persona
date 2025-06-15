@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,8 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -15,25 +18,18 @@ const SignUp = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeText, setResumeText] = useState('');
   const [isPublic, setIsPublic] = useState('private');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setResumeFile(file);
-    }
-  };
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!resumeFile) {
+    if (!resumeText.trim()) {
       toast({
         title: 'Resume Required',
-        description: 'Please upload your resume to create a persona.',
+        description: 'Please paste your resume to create a persona.',
         variant: 'destructive',
       });
       return;
@@ -84,23 +80,11 @@ const SignUp = () => {
         return;
     }
     
-    // 2. Upload resume
-    const filePath = `${user.id}/${Date.now()}_${resumeFile.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from('resumes')
-      .upload(filePath, resumeFile);
-
-    if (uploadError) {
-        setIsLoading(false);
-        toast({ title: 'Error Uploading Resume', description: uploadError.message, variant: 'destructive' });
-        return;
-    }
-
-    // 3. Create ElevenLabs agent via Edge Function
+    // 2. Create ElevenLabs agent via Edge Function (no file upload)
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
         body: {
-          resume_path: filePath,
+          resume_text: resumeText,
           first_name: firstName,
           last_name: lastName,
           elevenlabs_api_key: elevenLabsApiKey,
@@ -113,7 +97,6 @@ const SignUp = () => {
         .from('personas')
         .insert({
           user_id: user.id,
-          resume_path: filePath,
           is_public: isPublic === 'public',
           elevenlabs_api_key: elevenLabsApiKey,
           agent_id: agentData.agent_id,
@@ -124,8 +107,6 @@ const SignUp = () => {
 
     } catch (error: any) {
       setIsLoading(false);
-      // Clean up uploaded file
-      await supabase.storage.from('resumes').remove([filePath]);
       const description = error.message.includes('agent') ? error.message : 'An unexpected error occurred while creating your persona.';
       toast({ title: 'Error Creating Persona', description, variant: 'destructive' });
       return;
@@ -168,9 +149,31 @@ const SignUp = () => {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Create a password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
+             <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="resume-text">Paste Your Resume</Label>
+               <Textarea
+                id="resume-text"
+                placeholder="Paste your resume text here..."
+                className="min-h-[150px]"
+                value={resumeText}
+                onChange={(e) => setResumeText(e.target.value)}
+                required
+              />
+            </div>
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
-              <Input id="resume" type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold cursor-pointer" accept=".pdf,.docx,.txt" required />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-full">
+                      <Input id="resume" type="file" className="file:text-primary file:font-semibold cursor-not-allowed" disabled />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Due to traffic/load issues, fixing soon</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="elevenlabs-api-key">ElevenLabs API Key</Label>

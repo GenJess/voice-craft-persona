@@ -1,8 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import pdf from "https://esm.sh/pdf-parse@1.1.1";
-import mammoth from "https://esm.sh/mammoth@1.7.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { resume_path, first_name, last_name, elevenlabs_api_key } = await req.json();
+    const { resume_text, first_name, last_name, elevenlabs_api_key } = await req.json();
 
     const authHeader = req.headers.get("Authorization")!;
     const supabaseClient = createClient(
@@ -23,33 +21,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } }
     );
-
-    // 1. Download resume from storage
-    const { data: fileData, error: downloadError } = await supabaseClient.storage
-      .from("resumes")
-      .download(resume_path);
-
-    if (downloadError) throw downloadError;
-
-    // 2. Extract text from resume file
-    let resumeText = "";
-    const fileBuffer = await fileData.arrayBuffer();
-
-    if (resume_path.endsWith(".pdf")) {
-      const pdfData = await pdf(new Uint8Array(fileBuffer));
-      resumeText = pdfData.text;
-    } else if (resume_path.endsWith(".docx")) {
-      const { value } = await mammoth.extractRawText({ arrayBuffer: fileBuffer });
-      resumeText = value;
-    } else if (resume_path.endsWith(".txt")) {
-      resumeText = await fileData.text();
-    } else {
-      throw new Error("Unsupported file type. Please upload a PDF, DOCX, or TXT file.");
-    }
     
-    if (!resumeText.trim()) {
-      throw new Error("Could not extract text from the resume. Please ensure it's not an image-based file.");
+    if (!resume_text || !resume_text.trim()) {
+      throw new Error("Resume text is empty. Please paste your resume.");
     }
+
+    const resumeText = resume_text;
 
     // 3. Create ElevenLabs agent
     const agentName = `${first_name} ${last_name}'s Persona`;

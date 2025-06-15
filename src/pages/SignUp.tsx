@@ -8,6 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/components/ui/use-toast';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -15,13 +16,31 @@ const SignUp = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [isPublic, setIsPublic] = useState('private');
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setResumeFile(file);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!resumeFile) {
+      toast({
+        title: 'Resume Required',
+        description: 'Please upload your resume to create a persona.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsLoading(true);
 
+    // 1. Sign up the user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -44,36 +63,77 @@ const SignUp = () => {
       return;
     }
     
-    if (authData.user) {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({ id: authData.user.id, first_name: firstName, last_name: lastName });
-
-      if (profileError) {
+    // After sign-up, the user object might be null until email confirmation.
+    // However, the session might contain the user temporarily. We rely on authData.user
+    const user = authData.user;
+    if (!user) {
         setIsLoading(false);
         toast({
-          title: 'Error creating profile',
-          description: `Your account was created, but we couldn't set up your profile. Error: ${profileError.message}`,
-          variant: 'destructive',
+          title: 'Success!',
+          description: 'Please check your email to verify your account. Once verified, your persona will be created.',
         });
+        navigate('/');
         return;
-      }
+    }
+    
+    // 2. Create the profile
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, first_name: firstName, last_name: lastName });
+
+    if (profileError) {
+      setIsLoading(false);
+      toast({
+        title: 'Error creating profile',
+        description: `Your account was created, but we couldn't set up your profile. Error: ${profileError.message}`,
+        variant: 'destructive',
+      });
+      // At this point, the user exists but not the profile. They can try again later.
+      return;
+    }
+    
+    // 3. Upload resume and create persona
+    const filePath = `${user.id}/${Date.now()}_${resumeFile.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('resumes')
+      .upload(filePath, resumeFile);
+
+    if (uploadError) {
+        setIsLoading(false);
+        toast({ title: 'Error Uploading Resume', description: uploadError.message, variant: 'destructive' });
+        return;
     }
 
-    setIsLoading(false);
+    const { error: insertError } = await supabase
+      .from('personas')
+      .insert({
+        user_id: user.id,
+        resume_path: filePath,
+        is_public: isPublic === 'public',
+      });
 
+    if (insertError) {
+      setIsLoading(false);
+      // Try to clean up the uploaded file if persona creation fails
+      await supabase.storage.from('resumes').remove([filePath]);
+      toast({ title: 'Error Creating Persona', description: insertError.message, variant: 'destructive' });
+      return;
+    }
+
+
+    setIsLoading(false);
     toast({
       title: 'Success!',
-      description: 'Please check your email to verify your account.',
+      description: 'Your account and persona have been created. Please check your email to verify your account.',
     });
     navigate('/');
   };
 
   return (
     <div className="flex justify-center items-center min-h-[60vh]">
-      <Card className="w-full max-w-md bg-card/50">
+      <Card className="w-full max-w-lg bg-card/50">
         <CardHeader>
-          <CardTitle className="font-display text-2xl text-center">Create Account</CardTitle>
+          <CardTitle className="font-display text-2xl text-center">Create Account & Persona</CardTitle>
           <CardDescription className="text-center">
             Join ProPersona to create your professional voice
           </CardDescription>
@@ -98,6 +158,23 @@ const SignUp = () => {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" placeholder="Create a password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
+              <Input id="resume" type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold cursor-pointer" accept=".pdf,.docx,.txt" required />
+            </div>
+            <div className="grid w-full items-center gap-1.5">
+              <Label>Persona Visibility</Label>
+              <RadioGroup value={isPublic} onValueChange={setIsPublic} className="flex gap-4 pt-1">
+                <Label htmlFor="private" className="flex items-center space-x-2 cursor-pointer">
+                  <RadioGroupItem value="private" id="private" />
+                  <span>Private (Only you can see)</span>
+                </Label>
+                <Label htmlFor="public" className="flex items-center space-x-2 cursor-pointer">
+                  <RadioGroupItem value="public" id="public" />
+                  <span>Public (Discoverable by others)</span>
+                </Label>
+              </RadioGroup>
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" disabled={isLoading} className="w-full font-semibold">
@@ -107,7 +184,7 @@ const SignUp = () => {
                   Creating Account...
                 </>
               ) : (
-                'Create Account'
+                'Create Account & Persona'
               )}
             </Button>
             <p className="text-sm text-muted-foreground text-center">

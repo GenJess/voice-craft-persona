@@ -125,7 +125,7 @@ const CreatePersona = () => {
 
       if (agentError) throw agentError;
       
-      // Store persona in database
+      // Store persona in database with agent information
       const { error: insertError } = await supabase
         .from('personas')
         .insert({

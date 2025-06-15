@@ -1,8 +1,18 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { GoogleGenAI, GenerateContentResponse, Part } from "npm:@google/genai@^0.12.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
-serve(async (req) => {
+const PROMPT_FOR_FILE_EXTRACTION = `You are an expert document analysis AI. Your task is to extract all text content from the provided document.
+Preserve the original formatting as much as possible, including:
+- Paragraphs and line breaks
+- Headings (if discernible, represent them clearly)
+- Lists (bulleted or numbered, preserve markers)
+- Tables (represent as formatted text)
+
+Output only the extracted text. Do not add any commentary.
+If the document appears to be empty or unreadable, respond with "[[EMPTY_OR_UNREADABLE_DOCUMENT]]".`;
+
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -22,43 +32,19 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY is not set in Supabase secrets.');
     }
 
-    // Make request to Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            {
-              text: `You are an expert document analysis AI. Your task is to extract all text content from the provided document.
-              Preserve the original formatting as much as possible, including:
-              - Paragraphs and line breaks
-              - Headings (if discernible, represent them clearly)
-              - Lists (bulleted or numbered, preserve markers)
-              - Tables (represent as formatted text)
-              
-              Output only the extracted text. Do not add any commentary.
-              If the document appears to be empty or unreadable, respond with "[[EMPTY_OR_UNREADABLE_DOCUMENT]]".`
-            },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
-              }
-            }
-          ]
-        }]
-      })
+    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+    const filePart: Part = {
+      inlineData: { data: base64Data, mimeType: mimeType },
+    };
+    const textInstructionPart: Part = { text: PROMPT_FOR_FILE_EXTRACTION };
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-04-17',
+      contents: { parts: [filePart, textInstructionPart] },
     });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    const extractedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+    const extractedText = response.text;
 
     if (!extractedText) {
       throw new Error('No text extracted from document');

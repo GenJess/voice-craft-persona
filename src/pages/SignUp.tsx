@@ -48,7 +48,7 @@ const SignUp = () => {
     }
     setIsLoading(true);
 
-    // 1. Sign up the user
+    // 1. Sign up the user. The profile will be created automatically via a trigger.
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -84,23 +84,7 @@ const SignUp = () => {
         return;
     }
     
-    // 2. Create the profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({ id: user.id, first_name: firstName, last_name: lastName });
-
-    if (profileError) {
-      setIsLoading(false);
-      toast({
-        title: 'Error creating profile',
-        description: `Your account was created, but we couldn't set up your profile. Error: ${profileError.message}`,
-        variant: 'destructive',
-      });
-      // At this point, the user exists but not the profile. They can try again later.
-      return;
-    }
-    
-    // 3. Upload resume
+    // 2. Upload resume
     const filePath = `${user.id}/${Date.now()}_${resumeFile.name}`;
     const { error: uploadError } = await supabase.storage
       .from('resumes')
@@ -112,7 +96,7 @@ const SignUp = () => {
         return;
     }
 
-    // 4. Create ElevenLabs agent via Edge Function
+    // 3. Create ElevenLabs agent via Edge Function
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
         body: {

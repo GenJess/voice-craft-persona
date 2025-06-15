@@ -9,7 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      personas: {
+        Row: {
+          agent_id: string | null
+          avatar_url: string | null
+          conversation_link: string | null
+          created_at: string
+          elevenlabs_api_key: string | null
+          id: string
+          is_public: boolean | null
+          resume_path: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: string | null
+          avatar_url?: string | null
+          conversation_link?: string | null
+          created_at?: string
+          elevenlabs_api_key?: string | null
+          id?: string
+          is_public?: boolean | null
+          resume_path?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          avatar_url?: string | null
+          conversation_link?: string | null
+          created_at?: string
+          elevenlabs_api_key?: string | null
+          id?: string
+          is_public?: boolean | null
+          resume_path?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          first_name: string | null
+          id: string
+          last_name: string | null
+        }
+        Insert: {
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+        }
+        Update: {
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

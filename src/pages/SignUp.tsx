@@ -22,7 +22,7 @@ const SignUp = () => {
     event.preventDefault();
     setIsLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -34,21 +34,39 @@ const SignUp = () => {
       },
     });
 
-    setIsLoading(false);
-
-    if (error) {
+    if (authError) {
+      setIsLoading(false);
       toast({
         title: 'Error signing up',
-        description: error.message,
+        description: authError.message,
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: 'Success!',
-        description: 'Please check your email to verify your account.',
-      });
-      navigate('/');
+      return;
     }
+    
+    if (authData.user) {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({ id: authData.user.id, first_name: firstName, last_name: lastName });
+
+      if (profileError) {
+        setIsLoading(false);
+        toast({
+          title: 'Error creating profile',
+          description: `Your account was created, but we couldn't set up your profile. Error: ${profileError.message}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setIsLoading(false);
+
+    toast({
+      title: 'Success!',
+      description: 'Please check your email to verify your account.',
+    });
+    navigate('/');
   };
 
   return (

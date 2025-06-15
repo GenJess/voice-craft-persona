@@ -1,8 +1,6 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
-	darkMode: ["class"],
 	content: [
 		"./pages/**/*.{ts,tsx}",
 		"./components/**/*.{ts,tsx}",
@@ -85,9 +83,6 @@ export default {
 				'accordion-up': {
 					from: {
 						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
 					}
 				}
 			},

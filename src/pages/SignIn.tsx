@@ -21,7 +21,7 @@ const SignIn = () => {
 
   return (
     <div className="flex justify-center items-center min-h-[60vh]">
-      <Card className="w-full max-w-md bg-card/50">
+      <Card className="w-full max-w-md bg-card">
         <CardHeader>
           <CardTitle className="font-display text-2xl text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">

@@ -29,7 +29,7 @@ const PublicPersonas = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {dummyPersonas.map((persona, index) => (
-          <Card key={index} className="bg-card/50 hover:bg-card/70 transition-colors">
+          <Card key={index} className="bg-card hover:bg-accent transition-colors">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>{persona.name}</span>

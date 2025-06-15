@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ const SignUp = () => {
   const [lastName, setLastName] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isPublic, setIsPublic] = useState('private');
+  const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -34,6 +34,14 @@ const SignUp = () => {
       toast({
         title: 'Resume Required',
         description: 'Please upload your resume to create a persona.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (!elevenLabsApiKey) {
+      toast({
+        title: 'API Key Required',
+        description: 'Please provide your ElevenLabs API key.',
         variant: 'destructive',
       });
       return;
@@ -92,7 +100,7 @@ const SignUp = () => {
       return;
     }
     
-    // 3. Upload resume and create persona
+    // 3. Upload resume
     const filePath = `${user.id}/${Date.now()}_${resumeFile.name}`;
     const { error: uploadError } = await supabase.storage
       .from('resumes')
@@ -104,22 +112,40 @@ const SignUp = () => {
         return;
     }
 
-    const { error: insertError } = await supabase
-      .from('personas')
-      .insert({
-        user_id: user.id,
-        resume_path: filePath,
-        is_public: isPublic === 'public',
+    // 4. Create ElevenLabs agent via Edge Function
+    try {
+      const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
+        body: {
+          resume_path: filePath,
+          first_name: firstName,
+          last_name: lastName,
+          elevenlabs_api_key: elevenLabsApiKey,
+        },
       });
 
-    if (insertError) {
+      if (agentError) throw agentError;
+      
+      const { error: insertError } = await supabase
+        .from('personas')
+        .insert({
+          user_id: user.id,
+          resume_path: filePath,
+          is_public: isPublic === 'public',
+          elevenlabs_api_key: elevenLabsApiKey,
+          agent_id: agentData.agent_id,
+          conversation_link: agentData.conversation_link,
+        });
+
+      if (insertError) throw insertError;
+
+    } catch (error: any) {
       setIsLoading(false);
-      // Try to clean up the uploaded file if persona creation fails
+      // Clean up uploaded file
       await supabase.storage.from('resumes').remove([filePath]);
-      toast({ title: 'Error Creating Persona', description: insertError.message, variant: 'destructive' });
+      const description = error.message.includes('agent') ? error.message : 'An unexpected error occurred while creating your persona.';
+      toast({ title: 'Error Creating Persona', description, variant: 'destructive' });
       return;
     }
-
 
     setIsLoading(false);
     toast({
@@ -161,6 +187,11 @@ const SignUp = () => {
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="resume">Upload Your Resume (PDF, DOCX, TXT)</Label>
               <Input id="resume" type="file" onChange={handleFileChange} className="file:text-primary file:font-semibold cursor-pointer" accept=".pdf,.docx,.txt" required />
+            </div>
+            <div className="grid w-full items-center gap-1.5">
+              <Label htmlFor="elevenlabs-api-key">ElevenLabs API Key</Label>
+              <Input id="elevenlabs-api-key" type="password" placeholder="Your ElevenLabs API Key" required value={elevenLabsApiKey} onChange={(e) => setElevenLabsApiKey(e.target.value)} />
+              <p className="text-xs text-muted-foreground">Needed to create your AI voice agent. Find it <a href="https://elevenlabs.io/subscription" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">here</a>.</p>
             </div>
             <div className="grid w-full items-center gap-1.5">
               <Label>Persona Visibility</Label>

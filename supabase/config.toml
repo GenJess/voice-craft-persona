@@ -1,0 +1,3 @@
+
+[functions.create-agent]
+verify_jwt = true

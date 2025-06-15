@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Eye, Users, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface PublicPersona {
   name: string;
   title: string | null;
   location: string | null;
+  conversation_link: string | null;
+  avatar_url: string | null;
 }
 
 const PublicPersonas = () => {
@@ -23,6 +26,8 @@ const PublicPersonas = () => {
       const { data, error } = await supabase
         .from('personas')
         .select(`
+          conversation_link,
+          avatar_url,
           profiles (
             first_name,
             last_name
@@ -36,8 +41,10 @@ const PublicPersonas = () => {
       } else {
         const formattedPersonas = data.map((p: any) => ({
           name: `${p.profiles.first_name || ''} ${p.profiles.last_name || ''}`.trim(),
-          title: 'Professional', 
-          location: 'Remote'
+          title: 'Professional Persona', 
+          location: 'Remote',
+          conversation_link: p.conversation_link,
+          avatar_url: p.avatar_url,
         }));
         setPersonas(formattedPersonas);
       }
@@ -75,20 +82,25 @@ const PublicPersonas = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {personas.map((persona, index) => (
-            <Card key={index} className="bg-card hover:bg-accent transition-colors">
+            <Card key={index} className="bg-card hover:bg-accent transition-colors flex flex-col">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{persona.name}</span>
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                </CardTitle>
+                <div className="flex items-center gap-4">
+                  <Avatar>
+                    <AvatarImage src={persona.avatar_url ?? undefined} alt={`${persona.name}'s avatar`} />
+                    <AvatarFallback>{persona.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <CardTitle>{persona.name}</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-grow">
                 <p className="text-muted-foreground font-medium">{persona.title}</p>
                 <p className="text-sm text-muted-foreground">{persona.location}</p>
               </CardContent>
               <CardFooter>
-                <Button disabled variant="outline" className="w-full">
-                  View Persona (Coming Soon)
+                <Button asChild variant="outline" className="w-full" disabled={!persona.conversation_link}>
+                  <a href={persona.conversation_link ?? '#'} target="_blank" rel="noopener noreferrer">
+                    {persona.conversation_link ? 'Chat with Persona' : 'Agent Not Available'}
+                  </a>
                 </Button>
               </CardFooter>
             </Card>

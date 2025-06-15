@@ -1,6 +1,6 @@
 
 import { Link, useLocation } from 'react-router-dom';
-import { BotMessageSquare } from 'lucide-react';
+import { BotMessageSquare, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -8,8 +8,11 @@ const Header = () => {
   const location = useLocation();
   const navLinks = [
     { href: '/', label: 'Home' },
-    { href: '/public-personas', label: 'Public Personas' },
+    { href: '/personas', label: 'Personas' },
   ];
+
+  // TODO: Replace with actual auth state
+  const isSignedIn = false; // This will be replaced with actual auth logic
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -33,9 +36,27 @@ const Header = () => {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-4">
-          <Button asChild>
-            <Link to="/create-persona">Create Persona</Link>
-          </Button>
+          {isSignedIn ? (
+            <>
+              <Button variant="ghost" asChild>
+                <Link to="/create-persona">Create Persona</Link>
+              </Button>
+              <Button variant="ghost" size="icon" asChild>
+                <Link to="/account">
+                  <User className="h-4 w-4" />
+                </Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" asChild>
+                <Link to="/signin">Sign In</Link>
+              </Button>
+              <Button asChild>
+                <Link to="/signup">Sign Up</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

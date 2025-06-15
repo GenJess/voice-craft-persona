@@ -1,24 +1,24 @@
 
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Upload, KeyRound, Mic } from "lucide-react";
+import { Upload, Users, Shield } from "lucide-react";
 
 const Index = () => {
   const features = [
     {
       icon: <Upload className="h-8 w-8 text-primary" />,
-      title: "Upload Resume",
-      description: "Provide your resume in PDF, DOCX, or TXT format to give your persona a professional foundation.",
+      title: "Upload Once",
+      description: "Upload your resume once and create your professional persona that you can use anywhere.",
     },
     {
-      icon: <KeyRound className="h-8 w-8 text-primary" />,
-      title: "Enter API Keys",
-      description: "Securely input your OpenAI and ElevenLabs API keys to power the AI and voice generation.",
+      icon: <Users className="h-8 w-8 text-primary" />,
+      title: "Share & Discover",
+      description: "Make your persona public to be discovered by others, or keep it private for personal use.",
     },
     {
-      icon: <Mic className="h-8 w-8 text-primary" />,
-      title: "Speak & Share",
-      description: "Interact with your new professional persona and share it with your network.",
+      icon: <Shield className="h-8 w-8 text-primary" />,
+      title: "Your Control",
+      description: "Full control over your persona's visibility and how your professional information is shared.",
     },
   ];
 
@@ -32,11 +32,14 @@ const Index = () => {
           <span className="text-primary">Your Professional Persona.</span>
         </h1>
         <p className="max-w-2xl mx-auto mt-6 text-lg text-muted-foreground">
-          Transform your static resume into a dynamic, voice-interactive professional persona that can speak for itself. Engage recruiters and your network like never before.
+          Transform your static resume into a dynamic, voice-interactive professional persona. Upload once, use everywhere, and control who can discover your professional story.
         </p>
-        <div className="mt-8">
+        <div className="mt-8 flex gap-4 justify-center flex-wrap">
           <Button size="lg" asChild className="font-semibold">
-            <Link to="/create-persona">Create Your Persona Now</Link>
+            <Link to="/signup">Get Started</Link>
+          </Button>
+          <Button size="lg" variant="outline" asChild className="font-semibold">
+            <Link to="/personas">Explore Personas</Link>
           </Button>
         </div>
       </section>
@@ -44,7 +47,7 @@ const Index = () => {
       {/* How it Works Section */}
       <section id="how-it-works" className="w-full max-w-5xl text-center">
         <h2 className="text-3xl md:text-4xl font-bold font-display tracking-tight">How It Works</h2>
-        <p className="mt-4 text-muted-foreground">A simple three-step process to bring your professional profile to life.</p>
+        <p className="mt-4 text-muted-foreground">Create your account and build your professional persona in minutes.</p>
         <div className="mt-12 grid gap-8 md:grid-cols-3">
           {features.map((feature, index) => (
             <div key={index} className="flex flex-col items-center p-6 border border-border rounded-lg bg-card/50">

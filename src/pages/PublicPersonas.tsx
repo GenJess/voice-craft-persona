@@ -1,18 +1,22 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Loader2 } from "lucide-react";
+import { Eye, Users, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface PublicPersona {
-  name: string;
-  title: string | null;
-  location: string | null;
+  name: string; // Combined first_name and last_name
+  title: string | null; // Placeholder for now, or fetched from somewhere else
+  location: string | null; // Placeholder for now
   conversation_link: string | null;
   avatar_url: string | null;
+  // Raw fields from personas table:
+  id: string; // Add id for keying
+  first_name_from_profile: string | null; // To store first_name from joined profiles
+  last_name_from_profile: string | null; // To store last_name from joined profiles
+  // Other fields you might fetch directly from personas if you had them there, e.g., random_persona_name
 }
 
 const PublicPersonas = () => {
@@ -23,53 +27,51 @@ const PublicPersonas = () => {
   useEffect(() => {
     const fetchPublicPersonas = async () => {
       setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('personas')
-          .select(`
-            conversation_link,
-            avatar_url,
-            profiles (
-              first_name,
-              last_name
-            )
-          `)
-          .eq('is_public', true);
-        
-        if (error) {
-          console.error("Error fetching public personas:", error);
-          toast({ 
-            title: "Error", 
-            description: "Could not fetch public personas.", 
-            variant: "destructive"
-          });
-        } else {
-          console.log("Fetched public personas:", data);
-          const formattedPersonas = data
-            .filter(p => p.profiles) // Only include personas with valid profiles
-            .map((p: any) => ({
-              name: `${p.profiles.first_name || ''} ${p.profiles.last_name || ''}`.trim() || 'Anonymous',
-              title: 'Professional Persona', 
-              location: 'Remote',
-              conversation_link: p.conversation_link,
-              avatar_url: p.avatar_url,
-            }));
-          setPersonas(formattedPersonas);
-        }
-      } catch (err) {
-        console.error("Unexpected error fetching public personas:", err);
-        toast({ 
-          title: "Error", 
-          description: "An unexpected error occurred.", 
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
+      const { data, error } = await supabase
+        .from('personas')
+        .select(`
+          id, // Select persona ID
+          conversation_link,
+          avatar_url,
+          profiles (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('is_public', true);
+      
+      if (error) {
+        console.error("Error fetching public personas:", error);
+        // Provide more detail if possible, e.g., error.details
+        toast({ title: "Error", description: `Could not fetch public personas: ${error.message}`, variant: "destructive"});
+        setPersonas([]); // Ensure personas are cleared on error
+      } else {
+        const formattedPersonas = data.map((p: any) => {
+          // Safely access profile data, as it might be null if no matching profile exists
+          const firstName = p.profiles?.first_name || '';
+          const lastName = p.profiles?.last_name || '';
+
+          return {
+            id: p.id, // Use the persona ID as key
+            name: `${firstName} ${lastName}`.trim(),
+            title: 'Professional Persona', // This seems to be a static value in your current setup
+            location: 'Remote', // This seems to be a static value in your current setup
+            conversation_link: p.conversation_link,
+            avatar_url: p.avatar_url,
+            first_name_from_profile: firstName, // Store for debugging if needed
+            last_name_from_profile: lastName, // Store for debugging if needed
+            // If your 'personas' table had 'random_persona_name', you'd map it like:
+            // random_persona_name: p.random_persona_name,
+          };
+        }).filter(p => p.name.length > 0); // Filter out personas that have no name from profiles
+
+        setPersonas(formattedPersonas);
       }
+      setLoading(false);
     };
     
     fetchPublicPersonas();
-  }, [toast]);
+  }, [toast]); // Add toast to dependency array as it's used inside useEffect
 
   return (
     <div>
@@ -98,8 +100,8 @@ const PublicPersonas = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {personas.map((persona, index) => (
-            <Card key={index} className="bg-card hover:bg-accent transition-colors flex flex-col">
+          {personas.map((persona) => ( // Removed index here, use persona.id as key
+            <Card key={persona.id} className="bg-card hover:bg-accent transition-colors flex flex-col">
               <CardHeader>
                 <div className="flex items-center gap-4">
                   <Avatar>

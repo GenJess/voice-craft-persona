@@ -20,7 +20,8 @@ const SignUp = () => {
   const [lastName, setLastName] = useState('');
   const [resumeText, setResumeText] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [isPublic, setIsPublic] = useState('private');
+  // Changed default to 'public' so personas are discoverable by default
+  const [isPublic, setIsPublic] = useState('public');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const navigate = useNavigate();
@@ -113,6 +114,28 @@ const SignUp = () => {
         return;
     }
     
+    // --- NEW: Insert into public.profiles table to fix "Could not fetch profile data" ---
+    const { error: profileInsertError } = await supabase
+        .from('profiles')
+        .insert({ 
+            id: user.id, 
+            first_name: firstName, 
+            last_name: lastName 
+        });
+
+    if (profileInsertError) {
+        setIsLoading(false);
+        toast({
+            title: 'Error saving profile',
+            description: profileInsertError.message,
+            variant: 'destructive',
+        });
+        // Important: If profile insertion fails, you might want to consider how to handle the partially created user.
+        // For this context, we'll stop the process here.
+        return;
+    }
+    // --- END NEW ---
+
     // 2. Create ElevenLabs agent via Edge Function
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {

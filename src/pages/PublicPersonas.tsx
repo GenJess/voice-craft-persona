@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Eye, Users, Loader2 } from "lucide-react";
+import { Users, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,32 +23,49 @@ const PublicPersonas = () => {
   useEffect(() => {
     const fetchPublicPersonas = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('personas')
-        .select(`
-          conversation_link,
-          avatar_url,
-          profiles (
-            first_name,
-            last_name
-          )
-        `)
-        .eq('is_public', true);
-      
-      if (error) {
-        console.error("Error fetching public personas:", error);
-        toast({ title: "Error", description: "Could not fetch public personas.", variant: "destructive"});
-      } else {
-        const formattedPersonas = data.map((p: any) => ({
-          name: `${p.profiles.first_name || ''} ${p.profiles.last_name || ''}`.trim(),
-          title: 'Professional Persona', 
-          location: 'Remote',
-          conversation_link: p.conversation_link,
-          avatar_url: p.avatar_url,
-        }));
-        setPersonas(formattedPersonas);
+      try {
+        const { data, error } = await supabase
+          .from('personas')
+          .select(`
+            conversation_link,
+            avatar_url,
+            profiles (
+              first_name,
+              last_name
+            )
+          `)
+          .eq('is_public', true);
+        
+        if (error) {
+          console.error("Error fetching public personas:", error);
+          toast({ 
+            title: "Error", 
+            description: "Could not fetch public personas.", 
+            variant: "destructive"
+          });
+        } else {
+          console.log("Fetched public personas:", data);
+          const formattedPersonas = data
+            .filter(p => p.profiles) // Only include personas with valid profiles
+            .map((p: any) => ({
+              name: `${p.profiles.first_name || ''} ${p.profiles.last_name || ''}`.trim() || 'Anonymous',
+              title: 'Professional Persona', 
+              location: 'Remote',
+              conversation_link: p.conversation_link,
+              avatar_url: p.avatar_url,
+            }));
+          setPersonas(formattedPersonas);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching public personas:", err);
+        toast({ 
+          title: "Error", 
+          description: "An unexpected error occurred.", 
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     
     fetchPublicPersonas();

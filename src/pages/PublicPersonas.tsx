@@ -30,7 +30,7 @@ const PublicPersonas = () => {
       const { data, error } = await supabase
         .from('personas')
         .select(`
-          id, // Select persona ID
+          id, // REMOVED COMMENT: Was "//SelectpersonaID", caused 400 error.
           conversation_link,
           avatar_url,
           profiles (

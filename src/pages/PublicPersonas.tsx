@@ -2,18 +2,16 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Eye, Users, Loader2 } from "lucide-react";
+import { Users, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/components/ui/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface PublicPersona {
   id: string;
-  name: string;
-  title: string | null;
-  location: string | null;
-  conversation_link: string | null;
   avatar_url: string | null;
+  agent_id: string | null;
+  conversation_link: string;
 }
 
 const PublicPersonas = () => {
@@ -24,38 +22,31 @@ const PublicPersonas = () => {
   useEffect(() => {
     const fetchPublicPersonas = async () => {
       setLoading(true);
+      
+      // Simple query - just get what we need from personas table
       const { data, error } = await supabase
         .from('personas')
-        .select(`
-          id,
-          conversation_link,
-          avatar_url,
-          profiles (
-            first_name,
-            last_name
-          )
-        `)
+        .select('id, avatar_url, agent_id')
         .eq('is_public', true);
       
       if (error) {
         console.error("Error fetching public personas:", error);
-        toast({ title: "Error", description: `Could not fetch public personas: ${error.message}`, variant: "destructive"});
+        toast({ 
+          title: "Error", 
+          description: `Could not fetch public personas: ${error.message}`, 
+          variant: "destructive"
+        });
         setPersonas([]);
       } else {
-        const formattedPersonas = data.map((p: any) => {
-          const firstName = p.profiles?.first_name || '';
-          const lastName = p.profiles?.last_name || '';
-          const fullName = `${firstName} ${lastName}`.trim();
-          
-          return {
+        // Format the data and build conversation links
+        const formattedPersonas = data
+          .filter(p => p.agent_id) // Only include personas with agent_id
+          .map((p: any) => ({
             id: p.id,
-            name: fullName,
-            title: 'Professional Persona',
-            location: 'Remote',
-            conversation_link: p.conversation_link,
             avatar_url: p.avatar_url,
-          };
-        }).filter(p => p.name.length > 0);
+            agent_id: p.agent_id,
+            conversation_link: `https://elevenlabs.io/app/talk-to?agent_id=${p.agent_id}`
+          }));
 
         setPersonas(formattedPersonas);
       }
@@ -96,21 +87,21 @@ const PublicPersonas = () => {
             <Card key={persona.id} className="bg-card hover:bg-accent transition-colors flex flex-col">
               <CardHeader>
                 <div className="flex items-center gap-4">
-                  <Avatar>
-                    <AvatarImage src={persona.avatar_url ?? undefined} alt={`${persona.name}'s avatar`} />
-                    <AvatarFallback>{persona.name.charAt(0)}</AvatarFallback>
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={persona.avatar_url ?? undefined} alt="Persona avatar" />
+                    <AvatarFallback>🤖</AvatarFallback>
                   </Avatar>
-                  <CardTitle>{persona.name}</CardTitle>
+                  <CardTitle>AI Persona</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="flex-grow">
-                <p className="text-muted-foreground font-medium">{persona.title}</p>
-                <p className="text-sm text-muted-foreground">{persona.location}</p>
+                <p className="text-muted-foreground font-medium">Professional Voice Agent</p>
+                <p className="text-sm text-muted-foreground">Ready to chat</p>
               </CardContent>
               <CardFooter>
-                <Button asChild variant="outline" className="w-full" disabled={!persona.conversation_link}>
-                  <a href={persona.conversation_link ?? '#'} target="_blank" rel="noopener noreferrer">
-                    {persona.conversation_link ? 'Chat with Persona' : 'Agent Not Available'}
+                <Button asChild variant="outline" className="w-full">
+                  <a href={persona.conversation_link} target="_blank" rel="noopener noreferrer">
+                    Chat with Persona
                   </a>
                 </Button>
               </CardFooter>

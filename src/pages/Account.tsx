@@ -5,21 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { User, Eye, EyeOff, Upload, Loader2 } from 'lucide-react';
+import { User, Eye, EyeOff, Upload, Loader2, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Profile {
   first_name: string;
   last_name: string;
+  elevenlabs_agent_id: string;
+  elevenlabs_agent_link: string;
 }
 
 interface Persona {
   id: string;
   is_public: boolean;
   updated_at: string;
+  avatar_url: string;
+  conversation_link: string;
 }
 
 const Account = () => {
@@ -43,7 +48,7 @@ const Account = () => {
       
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('first_name, last_name')
+        .select('first_name, last_name, elevenlabs_agent_id, elevenlabs_agent_link')
         .eq('id', user!.id)
         .single();
       
@@ -56,7 +61,7 @@ const Account = () => {
 
       const { data: personaData, error: personaError } = await supabase
         .from('personas')
-        .select('id, is_public, updated_at')
+        .select('id, is_public, updated_at, avatar_url, conversation_link')
         .eq('user_id', user!.id)
         .maybeSingle();
 
@@ -105,20 +110,27 @@ const Account = () => {
             <User className="h-5 w-5" />
             Profile Information
           </CardTitle>
-          <CardDescription>Update your personal information</CardDescription>
+          <CardDescription>Your account details and avatar</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input id="name" defaultValue={`${profile?.first_name || ''} ${profile?.last_name || ''}`} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue={user?.email} disabled />
+          <div className="flex items-center gap-6">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={persona?.avatar_url} alt="Your avatar" />
+              <AvatarFallback>{profile?.first_name?.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold">{profile?.first_name} {profile?.last_name}</h3>
+              <p className="text-muted-foreground">{user?.email}</p>
+              {profile?.elevenlabs_agent_link && (
+                <Button asChild className="mt-2">
+                  <a href={profile.elevenlabs_agent_link} target="_blank" rel="noopener noreferrer">
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Chat with me
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">Profile information is managed through your initial sign up.</p>
         </CardContent>
       </Card>
 

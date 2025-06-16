@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -114,25 +113,6 @@ const SignUp = () => {
         return;
     }
     
-    // 2. Insert into public.profiles table
-    const { error: profileInsertError } = await supabase
-        .from('profiles')
-        .insert({ 
-            id: user.id, 
-            first_name: firstName, 
-            last_name: lastName 
-        });
-
-    if (profileInsertError) {
-        setIsLoading(false);
-        toast({
-            title: 'Error saving profile',
-            description: profileInsertError.message,
-            variant: 'destructive',
-        });
-        return;
-    }
-    
     // 3. Create ElevenLabs agent via Edge Function
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
@@ -149,10 +129,31 @@ const SignUp = () => {
       // Generate avatar URL using user.id as seed
       const avatarUrl = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.id}&scale=100`;
       
-      // Construct the correct conversation_link
+      // Construct the CORRECT conversation_link format
       const conversationLink = `https://elevenlabs.io/app/talk-to?agent_id=${agentData.agent_id}`;
 
-      // 4. Store persona in database with agent information and avatar
+      // 2. Insert into public.profiles table with agent info
+      const { error: profileInsertError } = await supabase
+          .from('profiles')
+          .insert({ 
+              id: user.id, 
+              first_name: firstName, 
+              last_name: lastName,
+              elevenlabs_agent_id: agentData.agent_id,
+              elevenlabs_agent_link: conversationLink
+          });
+
+      if (profileInsertError) {
+          setIsLoading(false);
+          toast({
+              title: 'Error saving profile',
+              description: profileInsertError.message,
+              variant: 'destructive',
+          });
+          return;
+      }
+
+      // 4. Store persona in database with agent information
       const { error: insertError } = await supabase
         .from('personas')
         .insert({
@@ -178,7 +179,7 @@ const SignUp = () => {
       title: 'Success!',
       description: 'Your account and persona have been created. Please check your email to verify your account.',
     });
-    navigate('/');
+    navigate('/account');
   };
 
   return (

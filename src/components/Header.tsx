@@ -1,4 +1,3 @@
-
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BotMessageSquare, User, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -51,9 +50,7 @@ const Header = () => {
         <div className="flex flex-1 items-center justify-end space-x-2">
           {session ? (
             <>
-              <Button variant="ghost" asChild>
-                <Link to="/create-persona">Create Persona</Link>
-              </Button>
+              {/* Removed "Create Persona" link as requested */}
               <Button variant="ghost" size="icon" asChild>
                 <Link to="/account">
                   <User className="h-4 w-4" />

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,6 @@ const SignUp = () => {
   const [lastName, setLastName] = useState('');
   const [resumeText, setResumeText] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  // Changed default to 'public' so personas are discoverable by default
   const [isPublic, setIsPublic] = useState('public');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
@@ -114,7 +114,7 @@ const SignUp = () => {
         return;
     }
     
-    // --- NEW: Insert into public.profiles table to fix "Could not fetch profile data" ---
+    // 2. Insert into public.profiles table
     const { error: profileInsertError } = await supabase
         .from('profiles')
         .insert({ 
@@ -130,13 +130,10 @@ const SignUp = () => {
             description: profileInsertError.message,
             variant: 'destructive',
         });
-        // Important: If profile insertion fails, you might want to consider how to handle the partially created user.
-        // For this context, we'll stop the process here.
         return;
     }
-    // --- END NEW ---
-
-    // 2. Create ElevenLabs agent via Edge Function
+    
+    // 3. Create ElevenLabs agent via Edge Function
     try {
       const { data: agentData, error: agentError } = await supabase.functions.invoke('create-agent', {
         body: {
@@ -149,6 +146,13 @@ const SignUp = () => {
 
       if (agentError) throw agentError;
       
+      // Generate avatar URL using user.id as seed
+      const avatarUrl = `https://api.dicebear.com/7.x/pixel-art/svg?seed=${user.id}&scale=100`;
+      
+      // Construct the correct conversation_link
+      const conversationLink = `https://elevenlabs.io/app/talk-to?agent_id=${agentData.agent_id}`;
+
+      // 4. Store persona in database with agent information and avatar
       const { error: insertError } = await supabase
         .from('personas')
         .insert({
@@ -156,7 +160,8 @@ const SignUp = () => {
           is_public: isPublic === 'public',
           elevenlabs_api_key: elevenLabsApiKey,
           agent_id: agentData.agent_id,
-          conversation_link: agentData.conversation_link,
+          conversation_link: conversationLink,
+          avatar_url: avatarUrl,
         });
 
       if (insertError) throw insertError;
